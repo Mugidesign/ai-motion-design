@@ -15,13 +15,21 @@ jobs:
         with:
           version: 9.12.0
 
+      # No `cache: pnpm` here: that option requires a pnpm-lock.yaml
+      # already committed to hash as a cache key, and this repo doesn't
+      # ship one — it was scaffolded in an environment with no network
+      # access, so `pnpm install` was never actually run to generate one.
+      # Once someone runs `pnpm install` locally and commits the resulting
+      # pnpm-lock.yaml, add `cache: pnpm` back here (and switch the
+      # install step below to `pnpm install --frozen-lockfile`) for
+      # faster, reproducible installs. Until then, plain `pnpm install`
+      # resolves and lockfiles fresh on every run.
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: pnpm
+          node-version: 22
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
       - name: Typecheck
         run: pnpm typecheck
@@ -44,11 +52,12 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 9.12.0
+      # See the comment on the same step in typecheck-and-lint above —
+      # no committed lockfile yet, so no `cache: pnpm`.
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+          node-version: 22
+      - run: pnpm install
       - name: Verify schema.ts produces a valid migration
         working-directory: packages/db
         run: pnpm generate
