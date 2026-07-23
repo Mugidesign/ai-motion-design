@@ -1,0 +1,14 @@
+{
+  "name": "crm-finance-mcp",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-03-07",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "durable_objects": {
+    "bindings": [{ "name": "CRM_FINANCE_MCP", "class_name": "CrmFinanceMcp" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["CrmFinanceMcp"] }]
+  // DATABASE_URL is a secret (wrangler secret put DATABASE_URL / .dev.vars
+  // locally) pointing at the self-hosted Postgres in docker-compose.yml —
+  // see docs/06-oss-free-stack.md. No Hyperdrive binding: it has no free tier.
+}

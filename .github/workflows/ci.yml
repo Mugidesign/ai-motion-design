@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  typecheck-and-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+  # Validates schema.ts is well-formed enough for drizzle-kit to process
+  # it. NOTE: this scaffold ships with packages/db/migrations/ empty (see
+  # its README.md) — a stricter "fail if `pnpm generate` produces an
+  # uncommitted diff" check only makes sense once your team has run
+  # `pnpm db:generate` for the first time and committed the result as your
+  # real migration baseline. Add that stricter check back in at that
+  # point; today it would fail on every run since there's nothing to diff
+  # against yet.
+  db-schema-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify schema.ts produces a valid migration
+        working-directory: packages/db
+        run: pnpm generate

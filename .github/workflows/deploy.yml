@@ -1,0 +1,65 @@
+name: Deploy Workers
+
+# Deploys the 8 Cloudflare Workers in this repo (5 MCP servers,
+# agents-worker, orchestrator, api-gateway) on every push to main.
+# apps/web (Next.js) is intentionally NOT deployed here — connect the
+# repo to Vercel directly (or your host of choice) for that; mixing a
+# Next.js deploy into a Workers-focused Actions file adds more moving
+# parts than it saves for most setups.
+#
+# Requires two repo secrets (Settings -> Secrets and variables -> Actions):
+#   CLOUDFLARE_API_TOKEN   — a token with Workers Scripts:Edit permission
+#   CLOUDFLARE_ACCOUNT_ID
+# Each Worker's own secrets (DATABASE_URL, SUPABASE_JWT_SECRET, provider
+# API keys, ...) are set once via `wrangler secret put` and persist across
+# deploys — they are NOT set through this workflow.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "workers/**"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    strategy:
+      # Order matters for a from-scratch environment (agents-worker must
+      # exist before things that service-bind to it) but not for updates
+      # to an already-deployed stack, where every Worker already exists —
+      # `fail-fast: false` so one Worker's deploy failure doesn't cancel
+      # the others mid-run.
+      fail-fast: false
+      matrix:
+        worker:
+          - workers/mcp-servers/motion-generator
+          - workers/mcp-servers/lead-enrichment
+          - workers/mcp-servers/communication
+          - workers/mcp-servers/knowledge
+          - workers/mcp-servers/crm-finance
+          - workers/agents
+          - workers/orchestrator
+          - workers/api-gateway
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Deploy ${{ matrix.worker }}
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: ${{ matrix.worker }}
+          command: deploy
