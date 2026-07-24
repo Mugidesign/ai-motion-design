@@ -24,7 +24,7 @@ export class CrmFinanceMcp extends McpAgent<Env> {
       "update_deal_stage",
       "商談のステージを更新し、audit_logに記録する",
       UpdateDealStageInputSchema.shape,
-      async (rawInput) => {
+      async (rawInput: unknown) => {
         const input = UpdateDealStageInputSchema.parse(rawInput);
         const db = createDb(this.env.DATABASE_URL);
         const [deal] = await db
@@ -50,7 +50,7 @@ export class CrmFinanceMcp extends McpAgent<Env> {
       "create_invoice",
       "冪等キー付きでStripe請求書を作成する。同じidempotencyKeyでの再試行は二重課金を起こさない。",
       CreateInvoiceInputSchema.shape,
-      async (rawInput) => {
+      async (rawInput: unknown) => {
         const input = CreateInvoiceInputSchema.parse(rawInput);
         const db = createDb(this.env.DATABASE_URL);
 

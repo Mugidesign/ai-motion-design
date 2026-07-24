@@ -53,7 +53,7 @@ export class CommunicationMcp extends McpAgent<Env> {
       "send_email",
       "コンプライアンスチェック（抑制リスト・地域別同意要件）を必ず通過させた上でメールを送信する。チェック不合格時は送信せずskippedReasonを返す。",
       SendEmailInputSchema.shape,
-      async (rawInput) => {
+      async (rawInput: unknown) => {
         const input = SendEmailInputSchema.parse(rawInput);
         const db = createDb(this.env.DATABASE_URL);
 
@@ -111,7 +111,7 @@ export class CommunicationMcp extends McpAgent<Env> {
       "send_slack_message",
       "既存見込み客とのフォローアップ用途に限定して使用する（コールドアウトリーチの主軸には使わない、docs/05 §3.3）",
       SendSlackMessageInputSchema.shape,
-      async (rawInput) => {
+      async (rawInput: unknown) => {
         const input = SendSlackMessageInputSchema.parse(rawInput);
         if (!this.env.SLACK_WEBHOOK_URL) {
           return { content: [{ type: "text" as const, text: JSON.stringify({ sent: false, skippedReason: "slack_not_configured" }) }] };

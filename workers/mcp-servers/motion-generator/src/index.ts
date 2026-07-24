@@ -33,7 +33,7 @@ export class MotionGeneratorMcp extends McpAgent<Env> {
       "generate_video",
       "商品情報とプロンプト仕様から動画生成ジョブを開始する（非同期・ジョブID返却）。qualityTier='draft'は低コストプロバイダに自動ルーティングされる。",
       GenerateVideoInputSchema.shape,
-      async (rawInput) => {
+      async (rawInput: unknown) => {
         const input = GenerateVideoInputSchema.parse(rawInput);
         const provider =
           input.preferredProvider === "mock" && input.qualityTier === "final"
@@ -50,7 +50,7 @@ export class MotionGeneratorMcp extends McpAgent<Env> {
       "check_generation_status",
       "動画生成ジョブの進捗をポーリングする",
       CheckGenerationStatusInputSchema.shape,
-      async (rawInput) => {
+      async (rawInput: unknown) => {
         const input = CheckGenerationStatusInputSchema.parse(rawInput);
         const adapter = getProviderAdapter(input.provider, this.env);
         const status = await adapter.checkStatus(input.jobId);

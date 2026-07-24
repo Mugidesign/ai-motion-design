@@ -55,5 +55,5 @@ export class FinanceAgent extends BaseFactoryAgent {
 
 function stripFences(text: string): string {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  return (fenced ? fenced[1] : text).trim();
+  return (fenced ? (fenced[1] ?? text) : text).trim();
 }

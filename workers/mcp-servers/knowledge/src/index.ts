@@ -46,7 +46,7 @@ export class KnowledgeMcp extends McpAgent<Env> {
       "ingest_source",
       "RAGソースを取り込み、チャンク化・埋め込み・pgvectorへの格納まで行う",
       IngestSourceInputSchema.shape,
-      async (rawInput) => {
+      async (rawInput: unknown) => {
         const input = IngestSourceInputSchema.parse(rawInput);
         const db = createDb(this.env.DATABASE_URL);
 
@@ -99,7 +99,7 @@ export class KnowledgeMcp extends McpAgent<Env> {
       "search_knowledge",
       "pgvectorのコサイン類似度でナレッジチャンクを検索する",
       SearchKnowledgeInputSchema.shape,
-      async (rawInput) => {
+      async (rawInput: unknown) => {
         const input = SearchKnowledgeInputSchema.parse(rawInput);
         const db = createDb(this.env.DATABASE_URL);
         const queryEmbedding = await embed(this.env, input.query);

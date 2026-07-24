@@ -39,7 +39,7 @@ export class LeadEnrichmentMcp extends McpAgent<Env> {
       "search_companies",
       "コンプライアンス済みソース（公式API/自社サイト）からのみ企業候補を検索する。LinkedIn/Instagram/Xの直接スクレイピングは実装しない（docs/05参照）。",
       SearchCompaniesInputSchema.shape,
-      async (rawInput) => {
+      async (rawInput: unknown) => {
         const input = SearchCompaniesInputSchema.parse(rawInput);
         const candidates = [];
         const skipped: string[] = [];
@@ -66,7 +66,7 @@ export class LeadEnrichmentMcp extends McpAgent<Env> {
       "enrich_company",
       "企業の公開サイトから構造化シグナルを取得する（動画有無・SNSリンク・OG情報など）。品質スコアリングそのものはLead Finder AgentがClaudeに判断させる（このツールは生データの取得のみ）。",
       EnrichCompanyInputSchema.shape,
-      async (rawInput) => {
+      async (rawInput: unknown) => {
         const input = EnrichCompanyInputSchema.parse(rawInput);
         if (!input.websiteUrl) {
           return { content: [{ type: "text" as const, text: JSON.stringify({ signals: null }) }] };
@@ -80,7 +80,7 @@ export class LeadEnrichmentMcp extends McpAgent<Env> {
       "check_suppression",
       "送信抑制リストと突合する。communication-mcpのsend_emailも内部で必ずこれを呼ぶため、Agentが個別に呼ぶのは事前チェック用途。",
       CheckSuppressionInputSchema.shape,
-      async (rawInput) => {
+      async (rawInput: unknown) => {
         const input = CheckSuppressionInputSchema.parse(rawInput);
         const db = createDb(this.env.DATABASE_URL);
         const rows = await db
