@@ -5,7 +5,7 @@
  *
  * Zod schemas double as runtime validation AND the source for the JSON
  * Schema each MCP server advertises in its `tools/list` response — see
- * zodToJsonSchema usage in workers/mcp-servers/*/src/index.ts.
+ * zodToJsonSchema usage in each server's index.ts under workers/mcp-servers/.
  */
 import { z } from "zod";
 
