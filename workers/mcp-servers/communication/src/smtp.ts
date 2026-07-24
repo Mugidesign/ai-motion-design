@@ -87,7 +87,11 @@ function dotStuff(body: string): string {
 }
 
 export async function sendSmtpMail(config: SmtpConfig, message: SmtpMessage): Promise<void> {
-  const socket = connect({ hostname: config.host, port: config.port }, { secureTransport: "on" });
+  // allowHalfOpen: false -- this is a full synchronous request/response
+  // protocol exchange (EHLO -> AUTH -> MAIL FROM -> ... -> QUIT), ending
+  // with an explicit socket.close() below, so there's never a need for
+  // one side of the socket to stay open after the other closes.
+  const socket = connect({ hostname: config.host, port: config.port }, { secureTransport: "on", allowHalfOpen: false });
   const writer = socket.writable.getWriter();
   const reader = socket.readable.getReader();
   const lineReader = new SmtpLineReader(reader);
