@@ -1,0 +1,144 @@
+# infra/docker-compose.yml
+#
+# Everything this project needs that isn't Cloudflare's free tier
+# (Workers, Durable Objects, KV, R2, Workers AI): Postgres+pgvector,
+# self-hosted auth (GoTrue), and optionally a local LLM (Ollama). See
+# docs/06-oss-free-stack.md for the full picture and honest cost/limits
+# discussion.
+#
+# Quick start:
+#   cp .env.example .env
+#   node scripts/generate-supabase-keys.mjs "$(openssl rand -base64 48)" >> .env
+#   # then hand-edit .env: move the SUPABASE_JWT_SECRET/ANON/SERVICE lines
+#   # to the right spots, fill in POSTGRES_PASSWORD, GOTRUE_AUTH_ADMIN_PASSWORD
+#   docker compose -f infra/docker-compose.yml up -d
+#   # schema is applied automatically via docker-entrypoint-initdb.d — see
+#   # the postgres service's volumes below. Nothing further to run by hand.
+#
+# All four services below are what's required. `ollama` and `pgweb` are
+# opt-in via Docker Compose profiles (`--profile local-llm`, `--profile
+# admin-ui`) since they're optional conveniences, not load-bearing.
+
+services:
+  postgres:
+    # pgvector/pgvector is the pgvector project's own official image
+    # (MIT-licensed, not a third-party fork) — plain Postgres plus the
+    # pgvector extension pre-installed, nothing else added.
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432" # expose for local `psql`/Drizzle Studio access; remove in any internet-facing deployment
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Runs once, in filename-sort order, on first boot only (Postgres's
+      # own convention — re-running docker-compose up on an existing
+      # volume will NOT re-run these). For subsequent schema changes use
+      # `pnpm db:generate` + `pnpm db:migrate` (packages/db) instead.
+      - ../infra/supabase/00-roles.sql:/docker-entrypoint-initdb.d/00-roles.sql:ro
+      - ../infra/supabase/bootstrap-schema.sql:/docker-entrypoint-initdb.d/10-schema.sql:ro
+      - ../infra/supabase/rls.sql:/docker-entrypoint-initdb.d/20-rls.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  gotrue:
+    # Supabase's own auth server, used standalone (without the rest of the
+    # Supabase stack — no PostgREST/Storage/Realtime/Kong/Studio here,
+    # since this project doesn't use them: data access goes through
+    # api-gateway + Drizzle, not PostgREST; files go to R2, not Supabase
+    # Storage; live updates go through Durable Object WebSockets, not
+    # Supabase Realtime).
+    image: supabase/gotrue:v2.167.0 # pin and bump deliberately; confirm current tag at hub.docker.com/r/supabase/gotrue/tags
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      PORT: 9999
+      GOTRUE_SITE_URL: ${SITE_URL:-http://localhost:3000}
+      GOTRUE_URI_ALLOW_LIST: ${SITE_URL:-http://localhost:3000}/*
+
+      GOTRUE_DB_DRIVER: postgres
+      DATABASE_URL: postgres://supabase_auth_admin:${GOTRUE_AUTH_ADMIN_PASSWORD:?set GOTRUE_AUTH_ADMIN_PASSWORD in .env}@postgres:5432/postgres?search_path=auth
+
+      GOTRUE_JWT_SECRET: ${SUPABASE_JWT_SECRET:?set SUPABASE_JWT_SECRET in .env — generate with scripts/generate-supabase-keys.mjs}
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+
+      # Dev convenience: skips the "confirm your email" step so sign-up ->
+      # sign-in works immediately without SMTP configured. Set to false
+      # and configure GOTRUE_SMTP_* once you have a real mail sender —
+      # see docs/06-oss-free-stack.md's note on this same tradeoff for
+      # outbound campaign email.
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_DISABLE_SIGNUP: "false" # flip to "true" once your tenant owners exist, to stop open self-signup
+
+      # Wires infra/supabase/rls.sql's custom_access_token_hook so every
+      # issued JWT carries tenant_id/app_role. VERIFY this env var name
+      # against current GoTrue docs before relying on it — Supabase's Auth
+      # Hooks configuration surface has changed across versions and this
+      # is the piece of this compose file least likely to still be exactly
+      # right by the time you read this:
+      # https://supabase.com/docs/guides/auth/auth-hooks
+      GOTRUE_HOOK_CUSTOM_ACCESS_TOKEN_ENABLED: "true"
+      GOTRUE_HOOK_CUSTOM_ACCESS_TOKEN_URI: "pg-functions://postgres/public/custom_access_token_hook"
+    ports:
+      - "9999:9999" # direct access for debugging; the app talks to GoTrue via the nginx proxy below, not this port
+
+  # supabase-js expects /auth/v1/* — see infra/nginx/auth-proxy.conf's
+  # header comment for why this exists instead of pointing straight at
+  # GoTrue.
+  auth-proxy:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - gotrue
+    volumes:
+      - ../infra/nginx/auth-proxy.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8000:8000" # this is what NEXT_PUBLIC_SUPABASE_URL should point at: http://localhost:8000
+
+  # --- optional: profile "local-llm" ---------------------------------
+  # Fully self-hosted LLM, zero API keys, zero cloud dependency — the
+  # option agent-kit's LLM_PROVIDER=ollama targets (packages/agent-kit).
+  # Not started by default (`docker compose up` skips it) since it needs
+  # real RAM/CPU or a GPU to be usable; opt in explicitly:
+  #   docker compose --profile local-llm up -d
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    profiles: ["local-llm"]
+    volumes:
+      - ollama-data:/root/.ollama
+    ports:
+      - "11434:11434"
+    # After first start: `docker compose exec ollama ollama pull llama3.1`
+    # (or a smaller model — llama3.2:3b if you're on modest hardware).
+
+  # --- optional: profile "admin-ui" ----------------------------------
+  # A tiny (single static binary, ~15MB image), MIT-licensed Postgres
+  # browser — a lightweight open-source alternative to Supabase Studio,
+  # which isn't included since running the rest of the Supabase stack
+  # just for its admin UI isn't worth the operational weight here.
+  #   docker compose --profile admin-ui up -d
+  pgweb:
+    image: sosedoff/pgweb:latest
+    restart: unless-stopped
+    profiles: ["admin-ui"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGWEB_DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/postgres?sslmode=disable
+    ports:
+      - "8081:8081"
+
+volumes:
+  postgres-data:
+  ollama-data:
