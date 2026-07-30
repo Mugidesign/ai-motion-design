@@ -7,8 +7,10 @@ import { getDb } from "../db";
 const app = new Hono<{ Bindings: Env; Variables: HonoVars }>();
 
 app.get("/deal/:dealId", async (c) => {
+  const dealId = c.req.param("dealId");
+  if (!dealId) return c.json({ error: "missing dealId" }, 400);
   const db = getDb(c.env);
-  const invoices = await db.select().from(schema.invoices).where(eq(schema.invoices.dealId, c.req.param("dealId")));
+  const invoices = await db.select().from(schema.invoices).where(eq(schema.invoices.dealId, dealId));
   return c.json({ invoices });
 });
 
@@ -16,11 +18,13 @@ app.get("/deal/:dealId", async (c) => {
  *  workers/agents/src/agents/finance.ts for the idempotency-key handling. */
 app.post("/deal/:dealId/create", async (c) => {
   const auth = c.get("auth");
+  const dealId = c.req.param("dealId");
+  if (!dealId) return c.json({ error: "missing dealId" }, 400);
   const db = getDb(c.env);
   const [deal] = await db
     .select()
     .from(schema.deals)
-    .where(and(eq(schema.deals.id, c.req.param("dealId")), eq(schema.deals.tenantId, auth.tenantId)));
+    .where(and(eq(schema.deals.id, dealId), eq(schema.deals.tenantId, auth.tenantId)));
   if (!deal) return c.json({ error: "deal not found" }, 404);
 
   const res = await c.env.AGENTS_WORKER.fetch(`https://agents-worker.internal/agents/finance/${auth.tenantId}`, {

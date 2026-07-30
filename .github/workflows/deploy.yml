@@ -89,9 +89,28 @@ jobs:
       - run: pnpm install
 
       - name: Deploy ${{ matrix.worker }}
+        id: deploy
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: ${{ matrix.worker }}
           command: deploy
+
+      - name: Post-deploy health check
+        # `steps.deploy.outputs.deployment-url` is wrangler-action@v3's
+        # documented output for the URL it just deployed to — VERIFY this
+        # key name against the current wrangler-action docs
+        # (https://github.com/cloudflare/wrangler-action) if this step
+        # can't find a URL; the action's output surface has changed
+        # across versions before. If it's empty, this step skips itself
+        # rather than failing the whole deploy on a naming mismatch alone
+        # — you can still run scripts/health-check.sh manually against
+        # your known Worker URLs as a fallback.
+        run: |
+          URL="${{ steps.deploy.outputs.deployment-url }}"
+          if [ -z "$URL" ]; then
+            echo "::warning::No deployment-url output from wrangler-action for ${{ matrix.worker }} — skipping automated health check. Run scripts/health-check.sh manually against this Worker's URL instead."
+            exit 0
+          fi
+          bash "${{ github.workspace }}/scripts/health-check.sh" "$URL/health"

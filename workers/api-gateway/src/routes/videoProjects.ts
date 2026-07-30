@@ -8,8 +8,10 @@ const app = new Hono<{ Bindings: Env; Variables: HonoVars }>();
 
 app.get("/:id", async (c) => {
   const auth = c.get("auth");
+  const id = c.req.param("id");
+  if (!id) return c.json({ error: "missing id" }, 400);
   const db = getDb(c.env);
-  const [project] = await db.select().from(schema.videoProjects).where(eq(schema.videoProjects.id, c.req.param("id")));
+  const [project] = await db.select().from(schema.videoProjects).where(eq(schema.videoProjects.id, id));
   if (!project || project.tenantId !== auth.tenantId) return c.json({ error: "not found" }, 404);
   const assets = await db.select().from(schema.videoAssets).where(eq(schema.videoAssets.videoProjectId, project.id));
   return c.json({ project, assets });
@@ -17,8 +19,10 @@ app.get("/:id", async (c) => {
 
 app.get("/:id/status", async (c) => {
   const auth = c.get("auth");
+  const id = c.req.param("id");
+  if (!id) return c.json({ error: "missing id" }, 400);
   const db = getDb(c.env);
-  const [project] = await db.select().from(schema.videoProjects).where(eq(schema.videoProjects.id, c.req.param("id")));
+  const [project] = await db.select().from(schema.videoProjects).where(eq(schema.videoProjects.id, id));
   if (!project || project.tenantId !== auth.tenantId) return c.json({ error: "not found" }, 404);
   return c.json({ status: project.status });
 });

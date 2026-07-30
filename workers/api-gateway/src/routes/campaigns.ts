@@ -29,12 +29,14 @@ const GenerateSchema = z.object({ leadIds: z.array(z.string().uuid()).min(1) });
 
 app.post("/:id/generate", async (c) => {
   const auth = c.get("auth");
+  const id = c.req.param("id");
+  if (!id) return c.json({ error: "missing id" }, 400);
   const body = GenerateSchema.parse(await c.req.json());
 
   const res = await c.env.AGENTS_WORKER.fetch(`https://agents-worker.internal/agents/sales/${auth.tenantId}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tenantId: auth.tenantId, leadIds: body.leadIds, campaignId: c.req.param("id") }),
+    body: JSON.stringify({ tenantId: auth.tenantId, leadIds: body.leadIds, campaignId: id }),
   });
   if (!res.ok) return c.json({ error: "draft generation failed", detail: await res.text() }, 502);
   return c.json(await res.json());
@@ -42,11 +44,13 @@ app.post("/:id/generate", async (c) => {
 
 app.get("/:id/messages", async (c) => {
   const auth = c.get("auth");
+  const id = c.req.param("id");
+  if (!id) return c.json({ error: "missing id" }, 400);
   const db = getDb(c.env);
   const [campaign] = await db
     .select()
     .from(schema.outreachCampaigns)
-    .where(and(eq(schema.outreachCampaigns.id, c.req.param("id")), eq(schema.outreachCampaigns.tenantId, auth.tenantId)));
+    .where(and(eq(schema.outreachCampaigns.id, id), eq(schema.outreachCampaigns.tenantId, auth.tenantId)));
   if (!campaign) return c.json({ error: "not found" }, 404);
 
   const messages = await db.select().from(schema.outreachMessages).where(eq(schema.outreachMessages.campaignId, campaign.id));
@@ -75,13 +79,15 @@ const ApproveSchema = z.object({
  */
 app.post("/:id/approve", requireRole("owner", "admin"), async (c) => {
   const auth = c.get("auth");
+  const id = c.req.param("id");
+  if (!id) return c.json({ error: "missing id" }, 400);
   const body = ApproveSchema.parse(await c.req.json());
   const db = getDb(c.env);
 
   const [campaign] = await db
     .select()
     .from(schema.outreachCampaigns)
-    .where(and(eq(schema.outreachCampaigns.id, c.req.param("id")), eq(schema.outreachCampaigns.tenantId, auth.tenantId)));
+    .where(and(eq(schema.outreachCampaigns.id, id), eq(schema.outreachCampaigns.tenantId, auth.tenantId)));
   if (!campaign) return c.json({ error: "not found" }, 404);
 
   const updated = await db

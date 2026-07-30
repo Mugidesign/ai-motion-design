@@ -86,7 +86,17 @@ export default {
       return MotionGeneratorMcp.serve("/mcp").fetch(request, env, ctx);
     }
     if (url.pathname === "/health") {
-      return Response.json({ ok: true, service: "motion-generator-mcp" });
+      // No DATABASE_URL dependency here, so there's no connectivity check
+      // to run — the meaningful health signal for this Worker is whether
+      // at least one real (non-mock) video provider is actually
+      // configured, since a deploy with zero providers set up can only
+      // ever produce placeholder output.
+      const providers = listAvailableProviders(env);
+      const hasRealProvider = providers.some((p) => p.provider !== "mock" && p.configured);
+      return Response.json(
+        { ok: true, service: "motion-generator-mcp", providers, warning: hasRealProvider ? undefined : "no real video provider configured — only mock output is available" },
+        { status: 200 } // configuration warnings don't fail the health check, they're informational
+      );
     }
     return new Response("Not found", { status: 404 });
   },

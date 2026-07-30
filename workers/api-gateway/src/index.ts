@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { checkDatabase, checkUpstreamWorker, buildHealthReport } from "@factory/health-kit";
 import type { Env, HonoVars } from "./types";
 import { supabaseAuth } from "./middleware/auth";
 import { rateLimit } from "./middleware/rateLimit";
@@ -25,7 +26,21 @@ app.use(
   })
 );
 
-app.get("/health", (c) => c.json({ ok: true, service: "api-gateway" }));
+/**
+ * Real health check, not just "the process started" — verifies Postgres
+ * is reachable and that both Workers this gateway depends on
+ * (agents-worker, orchestrator) are themselves healthy. Returns 503 if
+ * anything failed, which is what scripts/health-check.sh and
+ * .github/workflows/deploy.yml's post-deploy check key off of.
+ */
+app.get("/health", async (c) => {
+  const { body, httpStatus } = await buildHealthReport("api-gateway", {
+    database: () => checkDatabase(c.env.DATABASE_URL),
+    agentsWorker: () => checkUpstreamWorker(c.env.AGENTS_WORKER, "agents-worker"),
+    orchestrator: () => checkUpstreamWorker(c.env.ORCHESTRATOR, "orchestrator"),
+  });
+  return c.json(body, httpStatus as 200 | 503);
+});
 
 // Everything under /api/v1/* requires a verified Supabase Auth (GoTrue) session and a
 // per-tenant rate limit. Health check above stays outside this group.

@@ -18,12 +18,14 @@ const StageSchema = z.object({ stage: z.enum(["prospect", "negotiation", "won", 
 
 app.patch("/:id/stage", async (c) => {
   const auth = c.get("auth");
+  const id = c.req.param("id");
+  if (!id) return c.json({ error: "missing id" }, 400);
   const body = StageSchema.parse(await c.req.json());
   const db = getDb(c.env);
   const [updated] = await db
     .update(schema.deals)
     .set({ stage: body.stage })
-    .where(and(eq(schema.deals.id, c.req.param("id")), eq(schema.deals.tenantId, auth.tenantId)))
+    .where(and(eq(schema.deals.id, id), eq(schema.deals.tenantId, auth.tenantId)))
     .returning();
   if (!updated) return c.json({ error: "not found" }, 404);
   return c.json({ deal: updated });

@@ -11,6 +11,7 @@
  */
 import { createDb, schema } from "@factory/db";
 import { and, eq, isNull, lte, or } from "drizzle-orm";
+import { checkDatabase, buildHealthReport } from "@factory/health-kit";
 import { runStep, STEP_ORDER, type Env as PipelineEnv, type PipelineParams, type PipelineRunRow } from "./pipeline";
 
 export interface Env extends PipelineEnv {
@@ -27,7 +28,10 @@ export default {
     const db = createDb(env.DATABASE_URL);
 
     if (url.pathname === "/health") {
-      return Response.json({ ok: true, service: "orchestrator" });
+      const { body, httpStatus } = await buildHealthReport("orchestrator", {
+        database: () => checkDatabase(env.DATABASE_URL),
+      });
+      return Response.json(body, { status: httpStatus });
     }
 
     if (request.method === "POST" && url.pathname === "/pipelines") {

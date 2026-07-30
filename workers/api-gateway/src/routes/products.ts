@@ -55,11 +55,13 @@ app.post("/", async (c) => {
 
 app.get("/:id", async (c) => {
   const auth = c.get("auth");
+  const id = c.req.param("id");
+  if (!id) return c.json({ error: "missing id" }, 400);
   const db = getDb(c.env);
   const [product] = await db
     .select()
     .from(schema.products)
-    .where(eq(schema.products.id, c.req.param("id")));
+    .where(eq(schema.products.id, id));
   if (!product || product.tenantId !== auth.tenantId) return c.json({ error: "not found" }, 404);
   return c.json({ product });
 });

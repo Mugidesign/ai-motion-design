@@ -52,6 +52,18 @@ pnpm dev:web           # :3000
 
 初回起動だけならMotion Generatorは`mock`プロバイダ（プレースホルダー動画、$0）で一通り動作確認できます。実際の動画を生成するには`infra/oss-video-server/README.md`（無料GPU枠でのWan2.1セットアップ）または商用APIキーのいずれかが必要です。
 
+## ヘルスチェック
+
+全8ワーカーが`/health`エンドポイントを持ち、プロセスが起動しているかだけでなく**実際にDB接続できるか**まで検証します（DB非依存のMotion Generatorのみ、設定済み動画プロバイダの有無を返します）。`.github/workflows/deploy.yml`はデプロイ直後に各ワーカーへ自動でこれを叩きます。手動で確認したい場合：
+
+```bash
+# 個別URLを指定
+bash scripts/health-check.sh https://api-gateway.your-subdomain.workers.dev/health
+
+# アカウントのworkers.devサブドメインを指定して全8ワーカーを一括チェック
+bash scripts/health-check.sh --subdomain your-subdomain
+```
+
 ## リポジトリ構成
 
 ```

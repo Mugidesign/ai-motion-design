@@ -53,12 +53,14 @@ const PatchSchema = z.object({
 
 app.patch("/:id", async (c) => {
   const auth = c.get("auth");
+  const id = c.req.param("id");
+  if (!id) return c.json({ error: "missing id" }, 400);
   const body = PatchSchema.parse(await c.req.json());
   const db = getDb(c.env);
   const [updated] = await db
     .update(schema.leads)
     .set(body)
-    .where(and(eq(schema.leads.id, c.req.param("id")), eq(schema.leads.tenantId, auth.tenantId)))
+    .where(and(eq(schema.leads.id, id), eq(schema.leads.tenantId, auth.tenantId)))
     .returning();
   if (!updated) return c.json({ error: "not found" }, 404);
   return c.json({ lead: updated });
@@ -70,11 +72,13 @@ app.patch("/:id", async (c) => {
  *  send checks that table before doing anything else. */
 app.post("/:id/opt-out", async (c) => {
   const auth = c.get("auth");
+  const id = c.req.param("id");
+  if (!id) return c.json({ error: "missing id" }, 400);
   const db = getDb(c.env);
   const [lead] = await db
     .select()
     .from(schema.leads)
-    .where(and(eq(schema.leads.id, c.req.param("id")), eq(schema.leads.tenantId, auth.tenantId)));
+    .where(and(eq(schema.leads.id, id), eq(schema.leads.tenantId, auth.tenantId)));
   if (!lead) return c.json({ error: "not found" }, 404);
 
   await db.update(schema.leads).set({ consentStatus: "opted_out" }).where(eq(schema.leads.id, lead.id));

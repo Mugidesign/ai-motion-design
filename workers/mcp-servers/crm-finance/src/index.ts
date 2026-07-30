@@ -9,6 +9,7 @@ import { createDb, schema } from "@factory/db";
 import { eq } from "drizzle-orm";
 import { UpdateDealStageInputSchema, CreateInvoiceInputSchema, type CreateInvoiceOutputSchema } from "@factory/shared-types";
 import { z } from "zod";
+import { checkDatabase, buildHealthReport } from "@factory/health-kit";
 
 export interface Env {
   CRM_FINANCE_MCP: DurableObjectNamespace;
@@ -126,10 +127,15 @@ export class CrmFinanceMcp extends McpAgent<Env> {
 }
 
 export default {
-  fetch(request: Request, env: Env, ctx: ExecutionContext) {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
     const url = new URL(request.url);
     if (url.pathname === "/mcp") return CrmFinanceMcp.serve("/mcp").fetch(request, env, ctx);
-    if (url.pathname === "/health") return Response.json({ ok: true, service: "crm-finance-mcp" });
+    if (url.pathname === "/health") {
+      const { body, httpStatus } = await buildHealthReport("crm-finance-mcp", {
+        database: () => checkDatabase(env.DATABASE_URL),
+      });
+      return Response.json(body, { status: httpStatus });
+    }
     return new Response("Not found", { status: 404 });
   },
 };

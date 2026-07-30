@@ -1,5 +1,6 @@
 import { getAgentByName } from "agents";
 import type { FactoryEnv } from "@factory/agent-kit";
+import { checkDatabase, buildHealthReport } from "@factory/health-kit";
 
 import { PromptEngineerAgent } from "./agents/promptEngineer";
 import { StoryboardAgent } from "./agents/storyboard";
@@ -76,7 +77,10 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === "/health") {
-      return Response.json({ ok: true, service: "agents-worker", agents: Object.keys(AGENT_BINDING) });
+      const { body, httpStatus } = await buildHealthReport("agents-worker", {
+        database: () => checkDatabase(env.DATABASE_URL),
+      });
+      return Response.json({ ...body, agents: Object.keys(AGENT_BINDING) }, { status: httpStatus });
     }
 
     // Expected shape: /agents/<agent-slug>/<tenantId>[/...rest]

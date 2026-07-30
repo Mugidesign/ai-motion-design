@@ -12,6 +12,7 @@
     "hono": "^4.6.9",
     "@factory/db": "workspace:*",
     "@factory/shared-types": "workspace:*",
+    "@factory/health-kit": "workspace:*",
     "drizzle-orm": "^0.36.4",
     "zod": "^3.23.8",
     "jose": "^5.9.6"

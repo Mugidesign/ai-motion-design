@@ -14,7 +14,8 @@
     "@factory/shared-types": "workspace:*",
     "@factory/db": "workspace:*",
     "drizzle-orm": "^0.36.4",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "@factory/health-kit": "workspace:*"
   },
   "devDependencies": {
     "wrangler": "^3.90.0",

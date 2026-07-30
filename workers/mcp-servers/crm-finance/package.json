@@ -15,7 +15,8 @@
     "@factory/db": "workspace:*",
     "drizzle-orm": "^0.36.4",
     "stripe": "^17.3.1",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "@factory/health-kit": "workspace:*"
   },
   "devDependencies": {
     "wrangler": "^3.90.0",

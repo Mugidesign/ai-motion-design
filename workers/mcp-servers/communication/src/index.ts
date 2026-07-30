@@ -24,6 +24,7 @@ import { createDb, schema } from "@factory/db";
 import { eq } from "drizzle-orm";
 import { SendEmailInputSchema, SendSlackMessageInputSchema, type SendEmailOutput } from "@factory/shared-types";
 import { sendSmtpMail } from "./smtp";
+import { checkDatabase, buildHealthReport } from "@factory/health-kit";
 
 export interface Env {
   COMMUNICATION_MCP: DurableObjectNamespace;
@@ -152,10 +153,15 @@ function appendUnsubscribeFooter(html: string, leadId: string, tenantId: string)
 }
 
 export default {
-  fetch(request: Request, env: Env, ctx: ExecutionContext) {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
     const url = new URL(request.url);
     if (url.pathname === "/mcp") return CommunicationMcp.serve("/mcp").fetch(request, env, ctx);
-    if (url.pathname === "/health") return Response.json({ ok: true, service: "communication-mcp" });
+    if (url.pathname === "/health") {
+      const { body, httpStatus } = await buildHealthReport("communication-mcp", {
+        database: () => checkDatabase(env.DATABASE_URL),
+      });
+      return Response.json(body, { status: httpStatus });
+    }
     return new Response("Not found", { status: 404 });
   },
 };

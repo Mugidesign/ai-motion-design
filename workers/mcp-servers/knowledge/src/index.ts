@@ -17,6 +17,7 @@ import { createDb, schema } from "@factory/db";
 import { sql, eq } from "drizzle-orm";
 import { IngestSourceInputSchema, SearchKnowledgeInputSchema } from "@factory/shared-types";
 import { embed, type EmbeddingEnv } from "./embeddings";
+import { checkDatabase, buildHealthReport } from "@factory/health-kit";
 
 export interface Env extends EmbeddingEnv {
   KNOWLEDGE_MCP: DurableObjectNamespace;
@@ -132,10 +133,15 @@ export class KnowledgeMcp extends McpAgent<Env> {
 }
 
 export default {
-  fetch(request: Request, env: Env, ctx: ExecutionContext) {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
     const url = new URL(request.url);
     if (url.pathname === "/mcp") return KnowledgeMcp.serve("/mcp").fetch(request, env, ctx);
-    if (url.pathname === "/health") return Response.json({ ok: true, service: "knowledge-mcp" });
+    if (url.pathname === "/health") {
+      const { body, httpStatus } = await buildHealthReport("knowledge-mcp", {
+        database: () => checkDatabase(env.DATABASE_URL),
+      });
+      return Response.json(body, { status: httpStatus });
+    }
     return new Response("Not found", { status: 404 });
   },
 };
